@@ -4,7 +4,7 @@ export default function Loading() {
     return (
         <ImageBackground source={require('../img/loading.png')} resizeMode="cover" style={styles.container}>
             <View>
-                <StatusBar barStyle={'light-content'} />
+                <StatusBar hidden />
                 <View style={styles.container}>
                     <Text style={styles.text}>Loading...</Text>
                 </View>
