@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, StatusBar, ImageBackground, Animated, TouchableOpacity, ScrollView, SafeAreaView, RefreshControl } from 'react-native';
+import {
+    StyleSheet, Animated, Easing, TouchableOpacity, Text, View, StatusBar,
+    ImageBackground, ScrollView, SafeAreaView, RefreshControl, FlatList
+} from 'react-native';
 import { styles } from '../styles/weather';
 import PropTypes from 'prop-types';
 import moment from "moment";
@@ -8,85 +11,43 @@ import Icon_humidity from '../svg/humidity.svg'
 import Icon_pressure from '../svg/pressure.svg'
 import Icon_wind from '../svg/wind.svg'
 import Icon_temp from '../svg/temp.svg'
+import Icon_cloudy from '../svg/cloud.svg'
+import Icon_rain from '../svg/rain.svg'
+import Icon_clear from '../svg/clear.svg'
+import Icon_snow from '../svg/snow.svg'
+import Icon_thunderstorm from '../svg/thunderstorm.svg'
+import Icon_fog from '../svg/fog.svg'
 
-let check = false
+const groupBy = (arr, key) => {
+    const sortedArr = arr.sort((a, b) => moment.utc(a[key]) - moment(b[key]));
+    const currentDay = moment.utc().format("dddd");
+    const filteredArr = arr.filter(obj => {
+        const time = moment.utc(obj[key]).format('HH');
+        return time >= '00' && time <= '21';
+    });
 
-let day = moment(new Date()).format("dddd");
-let time = moment(new Date()).format("HH:mm");
-
-
-
-const weatherOptions = {
-    Thunderstorm: {
-        text: 'Thunderstorm',
-        url: require('../img/rain.png'),
-        urlNight: require('../img/nightRain.png'),
-    },
-    Drizzle: {
-        text: 'Drizzle',
-        url: require('../img/rain.png'),
-        urlNight: require('../img/nightRain.png'),
-    },
-    Rain: {
-        text: 'Rain',
-        url: require('../img/rain.png'),
-        urlNight: require('../img/nightRain.png'),
-    },
-    Snow: {
-        text: 'Snow',
-        url: require('../img/snow.png'),
-        urlNight: require('../img/nightSnow.png'),
-    },
-    Clear: {
-        text: 'Clear',
-        url: require('../img/clear.png'),
-        urlNight: require('../img/night.png'),
-    },
-    Clouds: {
-        text: 'Clouds',
-        url: require('../img/cloud.png'),
-        urlNight: require('../img/nightCloud.png'),
-    },
-    Fog: {
-        text: 'Fog',
-        url: require('../img/fog.png'),
-        urlNight: require('../img/nightFog.png'),
+    const currentDayData = arr.find((obj) => moment.utc(obj[key]).isSame(moment.utc(), "day"));
+    if (currentDayData) {
+        if (!filteredArr[currentDay]) filteredArr[currentDay] = [];
+        filteredArr[currentDay].unshift(currentDayData);
     }
+    return filteredArr.reduce((acc, obj) => {
+        const date = moment.utc(obj[key]).format("dddd");
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(obj);
+        return acc;
+    }, {});
+};
 
-}
-
-Weather.propTypes = {
-    temp: PropTypes.number.isRequired,
-    condition: PropTypes.oneOf(["Thunderstorm", "Drizzle", "Rain", "Snow", "Clear", "Clouds", "Fog"]).isRequired,
-}
-
-export default function Weather({ temp, condition, name, feels_like, speed, humidity, pressure, sunset, sunrise }) {
-
-    const [isOpen, setIsOpen] = useState(false);
-    const [refreshing, setRefreshing] = useState(false);
-
-    const onRefresh = () => {
-        setRefreshing(true);
-
-        console.log(time)
-        setRefreshing(false);
-    }
-
-    const heightAnimation = useRef(new Animated.Value(0)).current;
-
-    const toggleMenu = () => {
-        setIsOpen(!isOpen);
-    };
+const CustomDropdown = ({ title, children, minTemp, maxTemp, isOpen, toggleMenu }) => {
+    const heightAnimation = useRef(new Animated.Value(isOpen ? 400 : 0)).current;
 
     useEffect(() => {
-        const initialValue = isOpen ? 0 : 200;
-        const finalValue = isOpen ? 200 : 0;
-
-        heightAnimation.setValue(initialValue);
-
+        const finalValue = isOpen ? 400 : 0;
         Animated.timing(heightAnimation, {
             toValue: finalValue,
-            duration: 500,
+            duration: 700, // Increase duration to 1000ms
+            easing: Easing.ease,
             useNativeDriver: false,
         }).start();
     }, [isOpen]);
@@ -101,112 +62,169 @@ export default function Weather({ temp, condition, name, feels_like, speed, humi
         outputRange: [0, 1],
     });
 
-    // Time SET ------------------------------
-    let sunset1 = moment(new Date(sunset * 1000)).format("HH:mm");
-    let sunrise1 = moment(new Date(sunrise * 1000)).format("HH:mm");
-    console.log(sunset1, 'sunset1')
-    console.log(sunrise1, 'sunrise1')
-    console.log(time, 'time')
+    return (
+        <View style={styles.dropdownBackground}>
+            <TouchableOpacity onPress={toggleMenu}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ margin: 5, color: 'white', fontSize: 16.5 }}>{title}</Text>
+                    <Text style={{ margin: 5, color: 'white', alignSelf: 'flex-end', fontSize: 16.5 }}>{maxTemp}° / {minTemp}°</Text>
+                </View>
+            </TouchableOpacity>
+            {isOpen && (
+                <Animated.View style={[styles.dropdownMenu, { height: menuHeight, opacity: menuOpacity },]}>
+                    {children}
+                </Animated.View>
+            )}
+        </View>
+    );
+};
 
-    const [dayNight, setdayNight] = useState()
+const WeatherIcon = ({ weather }) => {
+    switch (weather) {
+        case 'Rain':
+            return <Icon_rain style={styles.icon} />
+        case 'Clouds':
+            return <Icon_cloudy style={styles.icon} />
+        case 'Clear':
+            return <Icon_clear style={styles.icon} />
+        case 'Snow':
+            return <Icon_snow style={styles.icon} />
+        case 'Thunderstorm':
+            return <Icon_thunderstorm style={style.icon} />
+        case 'Fog':
+            return <Icon_fog style={style.icon} />
 
-    if (check === false) {
-        check = true
-        dayOrnight()
+        default:
+            return <Icon_cloudy style={styles.icon} />
     }
+}
 
-    function dayOrnight() {
-        if (time > sunset1) {
-            setdayNight(false)
-            console.log("night")
-        }
-        else if (sunrise1 < time) {
-            setdayNight(true)
-            console.log("day")
-        }
-    }
+const WeatherDay = ({ data }) => {
+    const renderItem = ({ item }) => {
+        return (
+            <View key={item.date} style={{ flex: 1, alignItems: 'center', margin: 5, justifyContent: 'space-between', }}>
+                <View>
+                    <Text style={styles.textWeather}>{moment(item.dt_txt).format('HH:mm')}</Text>
+                </View>
+                <View>
+                    <WeatherIcon weather={item.condition} />
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                    <Icon_temp style={styles.icon} />
+                    <Text style={styles.textWeather}>{item.temp}</Text>
+                </View>
+            </View>
+        );
+    };
 
     return (
+        <FlatList showsHorizontalScrollIndicator={false} data={data} keyExtractor={(item) => item.dt_txt} renderItem={renderItem} horizontal refreshing={false}>
+        </FlatList>
+    );
+};
 
-        <SafeAreaView style={styles.container}>
-            <ScrollView
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                    />
-                }
-            >
+export default function Weather({ forecasts }) {
+
+    const [openIndex, setOpenIndex] = useState(-1);
+    const [weatherData, setWeatherData] = useState([]);
+
+    // Update the weather data when the forecasts prop changes
+    useEffect(() => {
+        setWeatherData(forecasts);
+    }, [forecasts]);
 
 
-                <StatusBar hidden />
+    const toggleMenu = (index) => {
+        if (openIndex === index) {
+            setOpenIndex(-1);
+        } else {
+            setOpenIndex(index);
+        }
+    };
 
-                <ImageBackground source={dayNight ? weatherOptions[condition].url : weatherOptions[condition].urlNight} resizeMode="cover" style={styles.container}>
+    let todayData;
+    const filteredForecasts = forecasts.filter((item) => moment(item.date).isSameOrAfter(moment(), "day"));
+    if (filteredForecasts.length > 0) {
+        todayData = filteredForecasts.shift();
+    }
 
-                    <View style={{ margin: 10 }}>
-                        <Text style={{ color: 'white', fontSize: 23 }}>{name}</Text>
+    const groupedData = groupBy(filteredForecasts, 'date');
+
+    return (
+        <View style={{ flex: 1, }} elastic={true}>
+            <View style={{ flex: 0.4 }}>
+                <View style={{ margin: 10 }}>
+                    <Text style={{ color: 'white', fontSize: 23 }}>{todayData.city}</Text>
+                </View>
+
+                <View style={{ alignItems: 'center', marginTop: 70 }}>
+                    <View style={{ marginTop: 15, flexDirection: 'row' }}>
+                        <Text style={{ fontSize: 50, color: 'white', letterSpacing: 2 }}>{todayData.temp}</Text>
+                        <Text style={{ color: 'white', fontSize: 22 }}>°C</Text>
                     </View>
+                </View>
+            </View>
 
-                    <View style={{ flex: 3, alignItems: 'center', marginTop: 70 }}>
-
-                        <View style={{ marginTop: 15, flexDirection: 'row' }}>
-                            <Text style={{ fontSize: 50, color: 'white', letterSpacing: 2 }}>{temp}</Text>
-                            <Text style={{ color: 'white', fontSize: 22, }}>°C</Text>
-
-
-                        </View>
-                        {/* <View style={{}}>
-                        <Ionicons name={weatherOptions[condition].iconName} size={45} color={weatherOptions[condition].color} />
-                    </View> */}
-
-                    </View>
-
-
-                    <View style={{ justifyContent: 'center', marginRight: 9, marginLeft: 9, borderBottomColor: 'white', borderBottomWidth: 1, }}>
-                        <TouchableOpacity onPress={toggleMenu}>
-                            <Text style={{ color: 'white', fontSize: 23, }}>{day}</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <Animated.View style={{ height: menuHeight, opacity: menuOpacity }}>
-                        <View style={{ flex: 1, margin: 15, justifyContent: 'space-between', flexDirection: 'row' }}>
-
-                            <View style={styles.contentWeather}>
-                                <Text style={styles.textWeather}>now</Text>
-                                <Icon_temp style={styles.icon} />
-                                <Text style={{ color: 'white', fontSize: 15 }}>{temp}</Text>
+            <View style={{ margin: 6, flex: 0.6 }}>
+                <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+                    {Object.keys(groupedData).map((key, index) => {
+                        const data = groupedData[key];
+                        const minTemp = Math.min(...data.map(item => item.temp));
+                        const maxTemp = Math.max(...data.map(item => item.temp));
+                        const humidity = Math.min(...data.map(item => item.humidity));
+                        const windSpeed = Math.max(...data.map(item => item.speed));
+                        const pressure = Math.max(...data.map(item => item.pressure));
+                        const feels_like = Math.max(...data.map(item => item.feels_like))
+                        return (
+                            <View key={key} style={{ marginBottom: 10, }}>
+                                <CustomDropdown title={key} minTemp={minTemp} maxTemp={maxTemp} isOpen={openIndex === index} toggleMenu={() => toggleMenu(index)}>
+                                    <View style={{ flex: 1, borderTopWidth: 1, borderColor: 'white', justifyContent: 'space-between', }} >
+                                        <WeatherDay data={groupedData[key]} date={key} />
+                                    </View>
+                                    <View style={{ borderTopWidth: 1, borderColor: 'white', justifyContent: 'space-between' }}>
+                                        <View style={{ height: 70, flexDirection: 'row', justifyContent: 'space-around' }}>
+                                            <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderColor: 'white' }}>
+                                                <View style={{ marginTop: 10, alignItems: 'center', }}>
+                                                    <Icon_humidity style={styles.icon} />
+                                                    <Text style={styles.textWeather}>{humidity}%</Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ flex: 1, alignItems: 'center', }}>
+                                                <View style={{ marginTop: 10, alignItems: 'center', }}>
+                                                    <Icon_wind style={styles.icon} />
+                                                    <Text style={styles.textWeather}>{windSpeed} km/h</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                        <View style={{ height: 70, flexDirection: 'row', justifyContent: 'space-around', borderTopWidth: 1, borderColor: 'white' }}>
+                                            <View style={{ flex: 1, alignItems: 'center', borderRightWidth: 1, borderColor: 'white' }}>
+                                                <View style={{ marginTop: 10, alignItems: 'center', }}>
+                                                    <Icon_pressure style={styles.icon} />
+                                                    <Text style={styles.textWeather}>{pressure} hPa</Text>
+                                                </View>
+                                            </View>
+                                            <View style={{ flex: 1, alignItems: 'center' }}>
+                                                <View style={{ marginTop: 10, alignItems: 'center', }}>
+                                                    <Icon_temp style={styles.icon} />
+                                                    <Text style={styles.textWeather}>{feels_like}°C (feels)</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </CustomDropdown>
                             </View>
-
-                            <View style={styles.contentWeather}>
-                                <Text style={styles.textWeather}>feels</Text>
-                                <Icon_temp style={styles.icon} />
-                                <Text style={{ color: 'white', fontSize: 15 }}>{feels_like}</Text>
-                            </View>
-
-                            <View style={styles.contentWeather}>
-                                <Text style={styles.textWeather}>wind</Text>
-                                <Icon_wind style={styles.icon} />
-                                <Text style={{ color: 'white', fontSize: 15 }}>{speed}</Text>
-                            </View>
-
-                            <View style={styles.contentWeather}>
-                                <Text style={styles.textWeather}>humidity</Text>
-                                <Icon_humidity style={styles.icon} />
-                                <Text style={{ color: 'white', fontSize: 15 }}>{humidity}</Text>
-                            </View>
-
-                            <View style={styles.contentWeather}>
-                                <Text style={styles.textWeather}>pressure</Text>
-                                <Icon_pressure style={styles.icon} />
-                                <Text style={{ color: 'white', fontSize: 15 }}>{pressure}</Text>
-                            </View>
-                        </View>
-                    </Animated.View>
-
-                </ImageBackground>
-
-            </ScrollView>
-        </SafeAreaView>
-    )
-
+                        );
+                    })}
+                </ScrollView>
+            </View >
+            <StatusBar
+                animated={true}
+                barStyle={'light-content'}
+                backgroundColor='black'
+            />
+        </View >
+    );
 }
+Weather.propTypes = {
+    forecasts: PropTypes.array.isRequired,
+};
