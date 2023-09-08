@@ -23,7 +23,8 @@
     "react-native-gesture-handler": "~2.5.0",
     "react-native-maps": "0.31.1",
     "react-native-svg": "^12.3.0",
-    "react-native-svg-transformer": "^1.0.0"
+    "react-native-svg-transformer": "^1.0.0",
+    "react-native-widget": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9"

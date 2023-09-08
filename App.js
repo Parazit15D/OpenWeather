@@ -6,7 +6,6 @@ import * as Location from 'expo-location';
 import axios from 'axios';
 import moment from "moment";
 
-
 const WEATHER_API_KEY = "384c2107b3553c438c95a12941f30d51"
 
 // https://api.openweathermap.org/data/2.5/forecast?lat=51.4958&lon=31.2927&appid=384c2107b3553c438c95a12941f30d51
@@ -35,12 +34,13 @@ const weatherImages = {
   },
 };
 
-export default class extends React.Component {
+export default class App extends React.Component {
 
   state = {
     isLoading: true,
     forecasts: [],
-    backgroundImage: null // выбранное изображение
+    backgroundImage: null,
+    location: null
   }
 
   getWeather = async (latitude, longitude) => {
@@ -69,7 +69,6 @@ export default class extends React.Component {
         sunset: new Date(city.sunset * 1000).toLocaleTimeString(),
       }
     })
-    console.log(forecasts)
 
     this.setState({
       isLoading: false,
@@ -94,8 +93,20 @@ export default class extends React.Component {
     return isDay ? image.day : image.night;
   };
 
+  setLocation = (location) => {
+    this.setState({ location }, () => {
+      const { latitude, longitude } = this.state.location;
+      this.getWeather(latitude, longitude);
+    });
+  };
 
   getLocation = async () => {
+    if (this.state.location) {
+      const { latitude, longitude } = this.state.location;
+      this.getWeather(latitude, longitude);
+      return;
+    }
+
     try {
       await Location.requestForegroundPermissionsAsync()
       const { coords: { latitude, longitude } } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest })
@@ -123,7 +134,7 @@ export default class extends React.Component {
         source={backgroundImage}
         style={{ flex: 1 }}
       >
-        <Weather forecasts={forecasts} />
+        <Weather forecasts={forecasts} setLocation={this.setLocation} />
       </ImageBackground>
     );
   }

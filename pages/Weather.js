@@ -3,6 +3,8 @@ import {
     StyleSheet, Animated, Easing, TouchableOpacity, Text, View, StatusBar,
     ImageBackground, ScrollView, SafeAreaView, RefreshControl, FlatList
 } from 'react-native';
+import Map from './Map';
+
 import { styles } from '../styles/weather';
 import PropTypes from 'prop-types';
 import moment from "moment";
@@ -123,10 +125,25 @@ const WeatherDay = ({ data }) => {
     );
 };
 
-export default function Weather({ forecasts }) {
+export default function Weather({ forecasts, setLocation }) {
 
     const [openIndex, setOpenIndex] = useState(-1);
     const [weatherData, setWeatherData] = useState([]);
+    const [mapVisible, setMapVisible] = useState(false);
+
+    const setDatas = (location) => {
+        setLocation(location);
+        console.log(location);
+    };
+
+    const onPressMap = () => {
+        setMapVisible(true);
+    };
+
+    const onCloseMap = () => {
+        setMapVisible(false);
+    };
+
 
     // Update the weather data when the forecasts prop changes
     useEffect(() => {
@@ -153,10 +170,12 @@ export default function Weather({ forecasts }) {
     return (
         <View style={{ flex: 1, }} elastic={true}>
             <View style={{ flex: 0.4 }}>
-                <View style={{ margin: 10 }}>
-                    <Text style={{ color: 'white', fontSize: 23 }}>{todayData.city}</Text>
-                </View>
-
+                <TouchableOpacity onPress={onPressMap}>
+                    <View style={{ margin: 10 }}>
+                        <Text style={{ color: 'white', fontSize: 23 }}>{todayData.city}</Text>
+                    </View>
+                </TouchableOpacity>
+                <Map visible={mapVisible} onClose={onCloseMap} setDatas={setDatas} />
                 <View style={{ alignItems: 'center', marginTop: 70 }}>
                     <View style={{ marginTop: 15, flexDirection: 'row' }}>
                         <Text style={{ fontSize: 50, color: 'white', letterSpacing: 2 }}>{todayData.temp}</Text>
@@ -225,6 +244,7 @@ export default function Weather({ forecasts }) {
         </View >
     );
 }
+
 Weather.propTypes = {
     forecasts: PropTypes.array.isRequired,
 };
